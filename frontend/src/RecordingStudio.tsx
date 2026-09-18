@@ -1,6 +1,8 @@
-import type { ReactNode, Ref } from 'react'
+import { useEffect, useState, type ReactNode, type Ref } from 'react'
 import Icon from './Icon'
 import { formatClock } from './practice'
+
+const REQUESTING_UI_DELAY_MS = 250
 
 export type Phase =
   | 'idle'
@@ -46,6 +48,24 @@ export default function RecordingStudio({
 }: RecordingStudioProps) {
   const isRecording = phase === 'recording'
   const busy = phase === 'requesting' || phase === 'analyzing'
+  const [showRequesting, setShowRequesting] = useState(false)
+  const [trackedPhase, setTrackedPhase] = useState(phase)
+  if (trackedPhase !== phase) {
+    setTrackedPhase(phase)
+    setShowRequesting(false)
+  }
+  const requesting = phase === 'requesting' && showRequesting
+  const showBusy = phase === 'analyzing' || requesting
+
+  useEffect(() => {
+    if (phase !== 'requesting') return
+    const timeout = window.setTimeout(
+      () => setShowRequesting(true),
+      REQUESTING_UI_DELAY_MS,
+    )
+    return () => window.clearTimeout(timeout)
+  }, [phase])
+
   const status =
     phase === 'requesting'
       ? 'Waiting for microphone access'
@@ -69,10 +89,10 @@ export default function RecordingStudio({
         <span
           className={`status-badge ${isRecording ? 'status-badge--recording' : ''}`}
         >
-          <span className={busy ? 'spinner' : 'status-dot'} />
+          <span className={showBusy ? 'spinner' : 'status-dot'} />
           {isRecording
             ? 'Recording'
-            : busy
+            : showBusy
               ? 'One moment'
               : hasRecording
                 ? 'Ready to review'
@@ -106,7 +126,7 @@ export default function RecordingStudio({
           <p className="recording-caption">
             {isRecording
               ? 'Take your time. You’ve got this.'
-              : phase === 'requesting'
+              : requesting
                 ? 'Allow microphone access in your browser to begin.'
                 : 'A deep breath. Then, just be yourself.'}
           </p>
@@ -168,11 +188,9 @@ export default function RecordingStudio({
             onClick={onStart}
             disabled={!canRecord || busy}
           >
-            {busy ? <span className="spinner" /> : <Icon name="mic" />}
-            {phase === 'requesting'
-              ? 'Connecting microphone…'
-              : 'Start recording'}
-            {!busy && <Icon name="arrow" />}
+            {showBusy ? <span className="spinner" /> : <Icon name="mic" />}
+            {requesting ? 'Connecting microphone…' : 'Start recording'}
+            {!showBusy && <Icon name="arrow" />}
           </button>
         )}
         {isRecording && (
