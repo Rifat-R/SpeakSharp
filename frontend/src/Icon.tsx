@@ -10,6 +10,7 @@ type IconName =
   | 'retry'
   | 'chevron'
   | 'audio'
+  | 'lock'
 
 const paths: Record<IconName, string> = {
   mic: 'M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm-7-4v1a7 7 0 0 0 14 0v-1M12 19v3m-4 0h8',
@@ -23,6 +24,7 @@ const paths: Record<IconName, string> = {
   retry: 'M3 10a9 9 0 1 1 1 7M3 4v6h6',
   chevron: 'm9 5 7 7-7 7',
   audio: 'M4 10v4m4-8v12m4-15v18m4-15v12m4-8v4',
+  lock: 'M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5V11Zm7 4v2',
 }
 
 export default function Icon({

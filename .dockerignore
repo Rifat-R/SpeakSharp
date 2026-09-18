@@ -1,0 +1,29 @@
+# Version control and editor artifacts
+.git
+.gitignore
+.github
+.idea
+.vscode
+.DS_Store
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+.venv
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.ruff_cache
+.mypy_cache
+
+# Node / frontend
+**/node_modules
+**/dist
+frontend/.fallow
+
+# Unrelated local files
+plans
+README.md

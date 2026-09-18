@@ -756,6 +756,91 @@ textarea::placeholder {
   padding: 0 6px;
 }
 
+.auth-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid #6b4741;
+  border-radius: 10px;
+  background: #302321;
+  color: #ddc4c0;
+  font-size: 0.76rem;
+}
+.auth-error .icon {
+  width: 15px;
+  height: 15px;
+  color: var(--red);
+}
+
+.password-dialog {
+  width: min(440px, calc(100vw - 36px));
+  padding: 0;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55);
+}
+.password-dialog::backdrop {
+  background: rgba(8, 10, 11, 0.7);
+}
+.password-dialog-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 30px;
+}
+.password-dialog-form h2 {
+  margin-top: 12px;
+  font-size: 1.35rem;
+}
+.password-dialog-lede {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.7;
+}
+.password-dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  width: 100%;
+  margin-top: 22px;
+}
+.password-dialog-field label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #c1c9c5;
+}
+.password-dialog-field input {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 0.9rem;
+}
+.password-dialog-field input:hover:not(:disabled) {
+  border-color: #4a5450;
+}
+.password-dialog-field input:disabled {
+  opacity: 0.6;
+}
+.password-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  width: 100%;
+  margin-top: 22px;
+}
+.password-dialog-actions .button {
+  min-width: 120px;
+}
+
 .recorded-question {
   display: flex;
   align-items: center;
@@ -1565,6 +1650,18 @@ textarea::placeholder {
   }
   .summary-description {
     font-size: 0.66rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .password-dialog-form {
+    padding: 24px 20px;
+  }
+  .password-dialog-actions {
+    flex-direction: column-reverse;
+  }
+  .password-dialog-actions .button {
+    width: 100%;
   }
 }
 

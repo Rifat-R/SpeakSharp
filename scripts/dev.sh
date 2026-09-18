@@ -35,6 +35,10 @@ fi
 # Keep the backend CORS origins in sync with the frontend port this script uses.
 export CORS_ORIGINS="${CORS_ORIGINS:-http://localhost:${FRONTEND_PORT},http://127.0.0.1:${FRONTEND_PORT}}"
 
+# Local development is unauthenticated unless explicitly overridden, even when
+# the .env file carries production-oriented deployment values.
+export APP_ENV="${APP_ENV:-development}"
+
 # Put each server in its own process group (via setsid when available) so the
 # whole tree, including uvicorn's reloader and Vite's children, can be stopped.
 USE_SETSID=0

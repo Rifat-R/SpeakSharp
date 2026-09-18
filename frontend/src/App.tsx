@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ApiError, analyzeAnswer } from './api'
+import { ApiError, analyzeAnswer, login } from './api'
 import AnalysisReport from './AnalysisReport'
 import Icon from './Icon'
+import PasswordDialog from './PasswordDialog'
 import QuestionPicker from './QuestionPicker'
 import RecordingStudio, { type Phase } from './RecordingStudio'
 import { formatClock, PRESET_QUESTIONS } from './practice'
@@ -47,6 +48,7 @@ function App() {
   const [recording, setRecording] = useState<Recording | null>(null)
   const [result, setResult] = useState<AnalysisResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [passwordPrompt, setPasswordPrompt] = useState(false)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -159,33 +161,63 @@ function App() {
     setElapsed(0)
     setResult(null)
     setError(null)
+    setPasswordPrompt(false)
     setPhase('idle')
   }, [])
 
-  const handleAnalyze = useCallback(async () => {
-    if (!recording) return
-    playerRef.current?.pause()
-    setPhase('analyzing')
-    setError(null)
+  const runAnalysis = useCallback(async (): Promise<
+    'complete' | 'auth-required' | 'failed'
+  > => {
+    if (!recording) return 'failed'
     try {
       const response = await analyzeAnswer(
         recording.question,
         recording.blob,
         `recording.${extensionFor(recording.mimeType)}`,
       )
-      if (!activeRef.current) return
+      if (!activeRef.current) return 'complete'
       setResult(response)
       setPhase('complete')
+      return 'complete'
     } catch (caught) {
-      if (!activeRef.current) return
+      if (!activeRef.current) return 'failed'
+      if (caught instanceof ApiError && caught.status === 401) {
+        return 'auth-required'
+      }
       setError(
         caught instanceof ApiError
           ? caught.message
           : 'Something went wrong while analyzing the recording.',
       )
       setPhase('error')
+      return 'failed'
     }
   }, [recording])
+
+  const handleAnalyze = useCallback(async () => {
+    if (!recording) return
+    playerRef.current?.pause()
+    setPhase('analyzing')
+    setError(null)
+    if ((await runAnalysis()) === 'auth-required') {
+      setPhase('ready')
+      setPasswordPrompt(true)
+    }
+  }, [recording, runAnalysis])
+
+  const handlePasswordSubmit = useCallback(
+    async (password: string) => {
+      await login(password)
+      setPasswordPrompt(false)
+      setPhase('analyzing')
+      setError(null)
+      if ((await runAnalysis()) === 'auth-required') {
+        setPhase('ready')
+        setPasswordPrompt(true)
+      }
+    },
+    [runAnalysis],
+  )
 
   useEffect(() => {
     if (phase !== 'recording') return
@@ -401,6 +433,11 @@ function App() {
           saved
         </span>
       </footer>
+      <PasswordDialog
+        open={passwordPrompt}
+        onCancel={() => setPasswordPrompt(false)}
+        onSubmit={handlePasswordSubmit}
+      />
     </div>
   )
 }

@@ -5,6 +5,14 @@ class HealthResponse(BaseModel):
     status: str
 
 
+class LoginResponse(BaseModel):
+    authenticated: bool
+
+
+class LoginRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=1024)
+
+
 class FillerOccurrence(BaseModel):
     text: str = Field(description="The detected filler word or phrase.")
     start: float = Field(description="Start time in seconds on the audio timeline.")

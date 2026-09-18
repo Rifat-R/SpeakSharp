@@ -12,7 +12,17 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.concurrency import run_in_threadpool
+from starlette.middleware.sessions import SessionMiddleware
 
+from .auth import (
+    SESSION_COOKIE_NAME,
+    LoginRateLimiter,
+    require_auth,
+    session_secret,
+)
+from .auth import (
+    router as auth_router,
+)
 from .config import Settings, get_settings
 from .metrics import compute_metrics
 from .models import AnalysisResponse, HealthResponse, SpeechMetrics
@@ -44,18 +54,31 @@ async def lifespan(app: FastAPI):
         if settings.openai_api_key
         else None
     )
+    app.state.login_limiter = LoginRateLimiter()
     yield
 
 
 app = FastAPI(title="SpeakSharp API", version="0.1.0", lifespan=lifespan)
 
+_app_settings = get_settings()
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=get_settings().cors_origin_list,
+    allow_origins=_app_settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=session_secret(_app_settings),
+    session_cookie=SESSION_COOKIE_NAME,
+    max_age=_app_settings.session_max_age_seconds,
+    same_site="lax",
+    https_only=_app_settings.session_https_only,
+)
+
+app.include_router(auth_router)
 
 
 def get_transcription_service(request: Request) -> TranscriptionService | None:
@@ -85,6 +108,7 @@ async def analyze(
     settings: Annotated[Settings, Depends(get_settings)],
     transcription: Annotated[TranscriptionService | None, Depends(get_transcription_service)],
     feedback: Annotated[FeedbackService | None, Depends(get_feedback_service)],
+    _: Annotated[None, Depends(require_auth)] = None,
 ) -> AnalysisResponse:
     if transcription is None or feedback is None:
         raise HTTPException(
