@@ -104,6 +104,7 @@ const WaveformPlayer = forwardRef<WaveformPlayerHandle, WaveformPlayerProps>(
 
       const waveSurfer = WaveSurfer.create({
         container,
+        backend: 'WebAudio',
         height: 96,
         waveColor: '#b9c2d0',
         progressColor: '#2f6fed',
@@ -131,12 +132,6 @@ const WaveformPlayer = forwardRef<WaveformPlayerHandle, WaveformPlayerProps>(
       const regions = RegionsPlugin.create()
       waveSurfer.registerPlugin(regions)
       regionsRef.current = regions
-
-      regions.on('region-clicked', (region, event) => {
-        event.stopPropagation()
-        waveSurfer.setTime(region.start)
-        void waveSurfer.play().catch(() => {})
-      })
 
       waveSurfer.on('ready', (readyDuration) => {
         if (!active) return
