@@ -1,0 +1,31 @@
+[project]
+name = "speaksharp"
+version = "0.1.0"
+description = "Practice interview questions and get transcription-based feedback."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "elevenlabs>=2.68.0",
+    "fastapi>=0.141.1",
+    "openai>=3.16.0",
+    "pydantic-settings>=2.15.0",
+    "python-multipart>=0.0.32",
+    "uvicorn[standard]>=0.53.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.16.8",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
