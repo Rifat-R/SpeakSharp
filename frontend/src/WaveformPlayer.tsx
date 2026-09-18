@@ -8,14 +8,17 @@ import {
 } from 'react'
 import WaveSurfer from 'wavesurfer.js'
 import RegionsPlugin from 'wavesurfer.js/plugins/regions'
+import Icon from './Icon'
+import { formatClock } from './practice'
 import type { FillerOccurrence, PauseOccurrence } from './types'
 
-const FILLER_REGION_COLOR = 'rgba(207, 59, 59, 0.25)'
-const PAUSE_REGION_COLOR = 'rgba(47, 111, 237, 0.18)'
+const FILLER_REGION_COLOR = 'rgba(237, 193, 129, 0.22)'
+const PAUSE_REGION_COLOR = 'rgba(165, 198, 243, 0.2)'
 const MIN_REGION_SECONDS = 0.08
 
 export interface WaveformPlayerHandle {
   seekTo: (seconds: number) => void
+  pause: () => void
 }
 
 interface WaveformPlayerProps {
@@ -23,13 +26,7 @@ interface WaveformPlayerProps {
   measuredDuration: number
   fillerOccurrences: FillerOccurrence[]
   pauseOccurrences: PauseOccurrence[]
-}
-
-function formatClock(totalSeconds: number): string {
-  const safeSeconds = Number.isFinite(totalSeconds) ? Math.max(0, totalSeconds) : 0
-  const minutes = Math.floor(safeSeconds / 60)
-  const seconds = Math.floor(safeSeconds % 60)
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`
+  showInsights: boolean
 }
 
 function addRegions(
@@ -60,7 +57,13 @@ function addRegions(
 
 const WaveformPlayer = forwardRef<WaveformPlayerHandle, WaveformPlayerProps>(
   function WaveformPlayer(
-    { src, measuredDuration, fillerOccurrences, pauseOccurrences },
+    {
+      src,
+      measuredDuration,
+      fillerOccurrences,
+      pauseOccurrences,
+      showInsights,
+    },
     ref,
   ) {
     const containerRef = useRef<HTMLDivElement>(null)
@@ -72,26 +75,46 @@ const WaveformPlayer = forwardRef<WaveformPlayerHandle, WaveformPlayerProps>(
     const [currentTime, setCurrentTime] = useState(0)
     const [duration, setDuration] = useState(measuredDuration)
     const [failed, setFailed] = useState(false)
+    const [playbackError, setPlaybackError] = useState<string | null>(null)
+
+    const seekTo = useCallback(
+      (seconds: number) => {
+        setPlaybackError(null)
+        const target = Math.max(0, Math.min(seconds, duration))
+        const audio = audioRef.current
+        if (audio) {
+          audio.currentTime = target
+          void audio
+            .play()
+            .catch(() =>
+              setPlaybackError(
+                'Playback could not start. Try the audio play control.',
+              ),
+            )
+          return
+        }
+        const waveSurfer = waveSurferRef.current
+        if (!waveSurfer || !isReady) return
+        waveSurfer.setTime(target)
+        void waveSurfer
+          .play()
+          .catch(() =>
+            setPlaybackError('Playback could not start. Please try again.'),
+          )
+      },
+      [duration, isReady],
+    )
 
     useImperativeHandle(
       ref,
       () => ({
-        seekTo(seconds: number) {
-          const audio = audioRef.current
-          if (audio) {
-            audio.currentTime = seconds
-            const playPromise = audio.play()
-            if (playPromise) playPromise.catch(() => {})
-            return
-          }
-
-          const waveSurfer = waveSurferRef.current
-          if (!waveSurfer) return
-          waveSurfer.setTime(seconds)
-          void waveSurfer.play().catch(() => {})
+        seekTo,
+        pause() {
+          audioRef.current?.pause()
+          waveSurferRef.current?.pause()
         },
       }),
-      [],
+      [seekTo],
     )
 
     useEffect(() => {
@@ -106,9 +129,9 @@ const WaveformPlayer = forwardRef<WaveformPlayerHandle, WaveformPlayerProps>(
         container,
         backend: 'WebAudio',
         height: 96,
-        waveColor: '#b9c2d0',
-        progressColor: '#2f6fed',
-        cursorColor: '#1c2430',
+        waveColor: '#526d5f',
+        progressColor: '#9ce5c5',
+        cursorColor: '#eeefeb',
         barWidth: 2,
         barGap: 1,
         barRadius: 2,
@@ -173,45 +196,163 @@ const WaveformPlayer = forwardRef<WaveformPlayerHandle, WaveformPlayerProps>(
     const togglePlay = useCallback(() => {
       const waveSurfer = waveSurferRef.current
       if (!waveSurfer) return
+      setPlaybackError(null)
       if (waveSurfer.isPlaying()) {
         waveSurfer.pause()
       } else {
-        void waveSurfer.play().catch(() => {})
+        void waveSurfer
+          .play()
+          .catch(() =>
+            setPlaybackError('Playback could not start. Please try again.'),
+          )
       }
     }, [])
 
-    if (failed) {
-      return (
-        <div className="player">
-          <audio
-            ref={audioRef}
-            className="playback"
-            controls
-            src={src}
-            onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
-          />
-          <span className="player-time">
-            {formatClock(currentTime)} / {formatClock(measuredDuration)}
-          </span>
-        </div>
-      )
-    }
-
     return (
       <div className="player">
-        <div className="waveform" ref={containerRef} aria-hidden="true" />
-        <div className="player-controls">
-          <button type="button" onClick={togglePlay}>
-            {isPlaying ? 'Pause' : 'Play'}
-          </button>
-          <span className="player-time">
-            {formatClock(currentTime)} / {formatClock(duration)}
-          </span>
-        </div>
-        <p className="player-legend">
-          <span className="legend-swatch legend-swatch--filler" /> Filler words
-          <span className="legend-swatch legend-swatch--pause" /> Pauses
-        </p>
+        {failed ? (
+          <>
+            <p className="playback-fallback">
+              The waveform isn’t available. You can still listen to your
+              recording below.
+            </p>
+            <audio
+              ref={audioRef}
+              className="playback"
+              controls
+              src={src}
+              aria-label="Your recorded answer"
+              onTimeUpdate={(event) =>
+                setCurrentTime(event.currentTarget.currentTime)
+              }
+              onError={() =>
+                setPlaybackError(
+                  'This browser could not play the recording. Try recording another answer.',
+                )
+              }
+            />
+            <span className="player-time">
+              {formatClock(currentTime)} / {formatClock(measuredDuration)}
+            </span>
+          </>
+        ) : (
+          <>
+            <div className="waveform-wrap">
+              <div className="waveform" ref={containerRef} aria-hidden="true" />
+              {!isReady && (
+                <div className="waveform-loading" role="status">
+                  <span className="spinner" />
+                  Preparing your audio…
+                </div>
+              )}
+            </div>
+            <div className="player-controls">
+              <button
+                className="player-toggle"
+                type="button"
+                onClick={togglePlay}
+                disabled={!isReady}
+              >
+                <Icon name={isPlaying ? 'pause' : 'play'} />
+                {isPlaying ? 'Pause' : 'Play'}
+              </button>
+              <input
+                className="player-seek"
+                type="range"
+                min={0}
+                max={duration || measuredDuration}
+                step={0.1}
+                value={Math.min(currentTime, duration)}
+                disabled={!isReady}
+                aria-label="Playback position"
+                aria-valuetext={`${formatClock(currentTime)} of ${formatClock(duration)}`}
+                onChange={(event) =>
+                  waveSurferRef.current?.setTime(Number(event.target.value))
+                }
+              />
+              <span className="player-time">
+                {formatClock(currentTime)} / {formatClock(duration)}
+              </span>
+            </div>
+          </>
+        )}
+        {playbackError && (
+          <p className="player-error" role="alert">
+            {playbackError}
+          </p>
+        )}
+        {showInsights && (
+          <>
+            {!failed && (
+              <p className="player-legend">
+                <span>
+                  <i className="legend-swatch legend-swatch--filler" />
+                  Filler words
+                </span>
+                <span>
+                  <i className="legend-swatch legend-swatch--pause" />
+                  Pauses
+                </span>
+                <span className="legend-hint">Select a moment to listen</span>
+              </p>
+            )}
+            <div className="moments">
+              <section aria-label="Filler moments">
+                <h3>
+                  Filler moments{' '}
+                  <span className="muted">/ {fillerOccurrences.length}</span>
+                </h3>
+                {fillerOccurrences.length ? (
+                  <div className="chip-list">
+                    {fillerOccurrences.map((occurrence, index) => (
+                      <button
+                        key={`filler-${index}`}
+                        type="button"
+                        className="chip chip--filler"
+                        disabled={!failed && !isReady}
+                        onClick={() => seekTo(occurrence.start)}
+                        aria-label={`Play filler ${occurrence.text} at ${formatClock(occurrence.start)}`}
+                      >
+                        {occurrence.text} · {formatClock(occurrence.start)}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="field-hint">
+                    No filler words detected in this answer.
+                  </p>
+                )}
+              </section>
+              <section aria-label="Pause moments">
+                <h3>
+                  Noticeable pauses{' '}
+                  <span className="muted">/ {pauseOccurrences.length}</span>
+                </h3>
+                {pauseOccurrences.length ? (
+                  <div className="chip-list">
+                    {pauseOccurrences.map((pause, index) => (
+                      <button
+                        key={`pause-${index}`}
+                        type="button"
+                        className="chip chip--pause"
+                        disabled={!failed && !isReady}
+                        onClick={() => seekTo(pause.start)}
+                        aria-label={`Play pause at ${formatClock(pause.start)}, ${pause.duration_seconds} seconds long`}
+                      >
+                        {formatClock(pause.start)} · {pause.duration_seconds}s
+                        pause
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="field-hint">
+                    No noticeable pauses detected in this answer.
+                  </p>
+                )}
+              </section>
+            </div>
+          </>
+        )}
       </div>
     )
   },
