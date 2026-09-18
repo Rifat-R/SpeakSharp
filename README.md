@@ -10,7 +10,8 @@ audio, transcripts, and feedback live only for the duration of a request.
 
 ## Tech stack
 
-- **Frontend:** React + TypeScript + Vite, browser `MediaRecorder`
+- **Frontend:** React + TypeScript + Vite, browser `MediaRecorder`,
+  [WaveSurfer.js](https://wavesurfer.xyz/) for playback
 - **Backend:** FastAPI (Python 3.13), managed with [uv](https://docs.astral.sh/uv/)
 - **Transcription:** ElevenLabs Scribe (`scribe_v2`) with word timestamps
 - **Objective metrics:** Python, derived from transcript timestamps
@@ -64,6 +65,20 @@ npm run dev
 The app runs at `http://localhost:5173`. To point at a different backend, set
 `VITE_API_URL` in `frontend/.env`.
 
+### Run both together
+
+Start the backend and frontend with one command:
+
+```sh
+./scripts/dev.sh
+```
+
+This serves the API at `http://localhost:8000` and the app at
+`http://localhost:5173`, and stops both when you press `Ctrl+C`. Override the
+ports if needed, for example `BACKEND_PORT=9000 FRONTEND_PORT=3000
+./scripts/dev.sh`; the script also sets `CORS_ORIGINS` to match the frontend
+port.
+
 ## Usage
 
 1. Choose one of the preset interview questions or enter a custom one.
@@ -92,9 +107,16 @@ analysis is performed.
 - **Word count** and **words per minute** – pace of speech.
 - **Filler words** – occurrences of a fixed English filler list (`um`, `uh`,
   `erm`, `hmm`, `er`, `ah`, `like`, `basically`, `actually`, `you know`,
-  `I mean`), plus a per-minute rate and a per-word breakdown.
+  `I mean`), plus a per-minute rate and a per-word breakdown. Each occurrence
+  carries its `start`/`end` time on the audio timeline.
 - **Noticeable pauses** – gaps between consecutive words that meet the
-  `PAUSE_THRESHOLD_SECONDS` threshold, with average and longest duration.
+  `PAUSE_THRESHOLD_SECONDS` threshold, with average and longest duration and
+  each pause's `start`/`end` time.
+
+The results screen renders the recording as a waveform. Filler words and
+noticeable pauses appear as marker regions, and the "Filler moments" and
+"Pauses" chips seek playback to that point. Timestamps are relative to the
+start of the recording, so they line up with the waveform.
 
 Filler detection is deliberate but imperfect: words like "like" are sometimes
 used meaningfully and will still be counted. Treat the metrics as guidance, not

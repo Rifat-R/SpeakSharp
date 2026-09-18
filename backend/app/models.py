@@ -5,6 +5,18 @@ class HealthResponse(BaseModel):
     status: str
 
 
+class FillerOccurrence(BaseModel):
+    text: str = Field(description="The detected filler word or phrase.")
+    start: float = Field(description="Start time in seconds on the audio timeline.")
+    end: float = Field(description="End time in seconds on the audio timeline.")
+
+
+class PauseOccurrence(BaseModel):
+    start: float = Field(description="Start time of the pause in seconds.")
+    end: float = Field(description="End time of the pause in seconds.")
+    duration_seconds: float = Field(description="Length of the pause in seconds.")
+
+
 class SpeechMetrics(BaseModel):
     duration_seconds: float = Field(
         description="Spoken duration in seconds, excluding leading and trailing silence."
@@ -16,6 +28,9 @@ class SpeechMetrics(BaseModel):
     filler_word_breakdown: dict[str, int] = Field(
         description="Count of each detected filler word or phrase."
     )
+    filler_occurrences: list[FillerOccurrence] = Field(
+        description="Each filler word with its position on the audio timeline."
+    )
     noticeable_pause_count: int = Field(
         description="Number of pauses at or above the noticeable pause threshold."
     )
@@ -23,6 +38,9 @@ class SpeechMetrics(BaseModel):
         description="Average duration of noticeable pauses in seconds."
     )
     longest_pause_seconds: float = Field(description="Longest noticeable pause in seconds.")
+    pause_occurrences: list[PauseOccurrence] = Field(
+        description="Each noticeable pause with its position on the audio timeline."
+    )
 
 
 class InterviewFeedback(BaseModel):

@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, analyzeAnswer } from './api'
-import type { AnalysisResponse, SpeechMetrics } from './types'
+import WaveformPlayer, { type WaveformPlayerHandle } from './WaveformPlayer'
+import type {
+  AnalysisResponse,
+  FillerOccurrence,
+  PauseOccurrence,
+  SpeechMetrics,
+} from './types'
+
+const NO_FILLERS: FillerOccurrence[] = []
+const NO_PAUSES: PauseOccurrence[] = []
 
 const PRESET_QUESTIONS = [
   'Tell me about yourself.',
@@ -31,6 +40,7 @@ interface Recording {
   blob: Blob
   url: string
   mimeType: string
+  durationSeconds: number
 }
 
 function pickMimeType(): string | undefined {
@@ -45,8 +55,9 @@ function extensionFor(mimeType: string): string {
 }
 
 function formatClock(totalSeconds: number): string {
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
+  const safe = Number.isFinite(totalSeconds) ? Math.max(0, totalSeconds) : 0
+  const minutes = Math.floor(safe / 60)
+  const seconds = Math.floor(safe % 60)
   return `${minutes}:${seconds.toString().padStart(2, '0')}`
 }
 
@@ -59,7 +70,13 @@ function MetricCard({ label, value }: { label: string; value: string }) {
   )
 }
 
-function MetricsPanel({ metrics }: { metrics: SpeechMetrics }) {
+function MetricsPanel({
+  metrics,
+  onSeek,
+}: {
+  metrics: SpeechMetrics
+  onSeek: (seconds: number) => void
+}) {
   const fillers = Object.entries(metrics.filler_word_breakdown)
 
   return (
@@ -92,6 +109,42 @@ function MetricsPanel({ metrics }: { metrics: SpeechMetrics }) {
             : 'None detected'}
         </span>
       </div>
+
+      {metrics.filler_occurrences.length > 0 && (
+        <div className="metric-card metric-card--wide">
+          <span className="metric-label">Filler moments</span>
+          <div className="chip-list">
+            {metrics.filler_occurrences.map((occurrence, index) => (
+              <button
+                key={`filler-${occurrence.start}-${index}`}
+                type="button"
+                className="chip chip--filler"
+                onClick={() => onSeek(occurrence.start)}
+              >
+                {occurrence.text} · {formatClock(occurrence.start)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {metrics.pause_occurrences.length > 0 && (
+        <div className="metric-card metric-card--wide">
+          <span className="metric-label">Pauses</span>
+          <div className="chip-list">
+            {metrics.pause_occurrences.map((pause, index) => (
+              <button
+                key={`pause-${pause.start}-${index}`}
+                type="button"
+                className="chip chip--pause"
+                onClick={() => onSeek(pause.start)}
+              >
+                {formatClock(pause.start)} · {pause.duration_seconds}s
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -161,6 +214,8 @@ function App() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const chunksRef = useRef<Blob[]>([])
+  const startedAtRef = useRef(0)
+  const playerRef = useRef<WaveformPlayerHandle>(null)
 
   const effectiveQuestion = useCustom ? customQuestion : question
   const canAnalyze = effectiveQuestion.trim().length > 0
@@ -206,15 +261,20 @@ function App() {
         const recordedMime = recorder.mimeType || mimeType || 'audio/webm'
         const blob = new Blob(chunksRef.current, { type: recordedMime })
         const url = URL.createObjectURL(blob)
+        const durationSeconds = Math.max(
+          0,
+          (performance.now() - startedAtRef.current) / 1000,
+        )
         setRecording((previous) => {
           if (previous) URL.revokeObjectURL(previous.url)
-          return { blob, url, mimeType: recordedMime }
+          return { blob, url, mimeType: recordedMime, durationSeconds }
         })
         setPhase('ready')
         releaseStream()
       }
 
       mediaRecorderRef.current = recorder
+      startedAtRef.current = performance.now()
       recorder.start()
       setElapsed(0)
       setPhase('recording')
@@ -234,6 +294,10 @@ function App() {
     setResult(null)
     setError(null)
     setPhase('idle')
+  }, [])
+
+  const handleSeek = useCallback((seconds: number) => {
+    playerRef.current?.seekTo(seconds)
   }, [])
 
   const handleAnalyze = useCallback(async () => {
@@ -405,7 +469,14 @@ function App() {
         </div>
 
         {recording && (
-          <audio className="playback" controls src={recording.url} />
+          <WaveformPlayer
+            key={recording.url}
+            ref={playerRef}
+            src={recording.url}
+            measuredDuration={recording.durationSeconds}
+            fillerOccurrences={result?.metrics.filler_occurrences ?? NO_FILLERS}
+            pauseOccurrences={result?.metrics.pause_occurrences ?? NO_PAUSES}
+          />
         )}
       </section>
 
@@ -413,7 +484,7 @@ function App() {
         <>
           <section className="panel">
             <h2>3. Objective metrics</h2>
-            <MetricsPanel metrics={result.metrics} />
+            <MetricsPanel metrics={result.metrics} onSeek={handleSeek} />
           </section>
 
           <section className="panel">

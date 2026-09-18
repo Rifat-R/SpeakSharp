@@ -20,8 +20,13 @@ def test_basic_metrics_and_fillers() -> None:
     assert metrics["words_per_minute"] == 160.0
     assert metrics["filler_word_count"] == 2
     assert metrics["filler_word_breakdown"] == {"um": 1, "you know": 1}
+    assert metrics["filler_occurrences"] == [
+        {"text": "um", "start": 0.6, "end": 0.9},
+        {"text": "you know", "start": 1.5, "end": 2.1},
+    ]
     assert metrics["filler_words_per_minute"] == 40.0
     assert metrics["noticeable_pause_count"] == 0
+    assert metrics["pause_occurrences"] == []
 
 
 def test_pause_detection_and_leading_silence() -> None:
@@ -37,6 +42,7 @@ def test_pause_detection_and_leading_silence() -> None:
     assert metrics["noticeable_pause_count"] == 1
     assert metrics["average_pause_seconds"] == 1.5
     assert metrics["longest_pause_seconds"] == 1.5
+    assert metrics["pause_occurrences"] == [{"start": 5.5, "end": 7.0, "duration_seconds": 1.5}]
 
 
 def test_pause_threshold_is_configurable() -> None:
@@ -54,7 +60,9 @@ def test_empty_transcript_returns_zeroed_metrics() -> None:
     assert metrics["words_per_minute"] == 0.0
     assert metrics["filler_word_count"] == 0
     assert metrics["filler_word_breakdown"] == {}
+    assert metrics["filler_occurrences"] == []
     assert metrics["noticeable_pause_count"] == 0
+    assert metrics["pause_occurrences"] == []
 
 
 def test_filler_normalization_ignores_punctuation_and_case() -> None:

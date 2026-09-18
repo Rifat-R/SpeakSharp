@@ -30,21 +30,23 @@ def _feedback() -> InterviewFeedback:
     )
 
 
+DEFAULT_WORDS = [
+    Word("Hello", 0.0, 0.5),
+    Word("um", 0.6, 0.9),
+    Word("world", 1.0, 1.4),
+]
+
+
 class FakeTranscription:
-    def __init__(self, error: Exception | None = None) -> None:
+    def __init__(self, error: Exception | None = None, words: list[Word] | None = None) -> None:
         self.error = error
+        self._words = words
 
     def transcribe(self, filename: str, content: bytes, content_type: str):
         if self.error:
             raise self.error
-        return TranscriptResult(
-            text="Hello um world",
-            words=[
-                Word("Hello", 0.0, 0.5),
-                Word("um", 0.6, 0.9),
-                Word("world", 1.0, 1.4),
-            ],
-        )
+        words = self._words if self._words is not None else DEFAULT_WORDS
+        return TranscriptResult(text=" ".join(word.text for word in words), words=words)
 
 
 class FakeFeedback:
@@ -95,7 +97,27 @@ def test_analyze_success(make_client) -> None:
     assert body["transcript"] == "Hello um world"
     assert body["metrics"]["word_count"] == 3
     assert body["metrics"]["filler_word_count"] == 1
+    assert body["metrics"]["filler_occurrences"] == [{"text": "um", "start": 0.6, "end": 0.9}]
+    assert body["metrics"]["pause_occurrences"] == []
     assert body["feedback"]["overall_assessment"] == "Clear but unfocused."
+
+
+def test_analyze_returns_pause_occurrences(make_client) -> None:
+    words = [Word("Hello", 0.0, 0.5), Word("world", 2.0, 2.5)]
+    client = make_client(transcription=FakeTranscription(words=words))
+
+    response = client.post(
+        "/api/analyze",
+        data={"question": "Tell me about yourself"},
+        files={"audio": VALID_AUDIO},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["metrics"]["noticeable_pause_count"] == 1
+    assert body["metrics"]["pause_occurrences"] == [
+        {"start": 0.5, "end": 2.0, "duration_seconds": 1.5}
+    ]
 
 
 def test_blank_question_is_rejected(make_client) -> None:
